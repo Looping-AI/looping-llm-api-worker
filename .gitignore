@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Wrangler
+.wrangler/
+
+# Environment / secrets
+.dev.vars
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# macOS
+.DS_Store
+
+# VSCode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# TypeScript
+*.tsbuildinfo
+
+# Auto-generated files
+worker-configuration.d.ts

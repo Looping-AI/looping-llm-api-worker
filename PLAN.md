@@ -23,7 +23,7 @@ Body:
 {
   "requestId": "uuid",
   "openrouter": { "model": "...", "messages": [...], ... },
-  "encryptedApiKey": { "v": 1, "iv": "<b64 12B>", "ct": "<b64 ciphertext+tag>" },
+  "encryptedApiKey": { "iv": "<b64 12B>", "ct": "<b64 ciphertext+tag>" },
   "truncate_thinking_to_max_chars": 4096 | null   // null -> default 4096
 }
 ```

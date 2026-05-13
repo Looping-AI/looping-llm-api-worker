@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "my-worker",
+	"name": "looping-llm-api-worker",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-05-12",
 	"observability": {
@@ -12,12 +12,15 @@
 	},
 	"workflows": [
 		{
-			"name": "workflow-my-worker",
-			"binding": "MY_WORKFLOW",
-			"class_name": "MyWorkflow"
+			"name": "llm-relay-workflow",
+			"binding": "LLM_RELAY",
+			"class_name": "LlmRelayWorkflow"
 		}
 	],
 	"upload_source_maps": true,
+	"vars": {
+		"CALLBACK_URL": ""
+	},
 	"compatibility_flags": [
 		"nodejs_compat"
 	]

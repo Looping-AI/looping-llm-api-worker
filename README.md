@@ -183,31 +183,48 @@ Other responses: `400` (bad request / invalid JSON / schema error), `401` (signa
 
 Once the workflow completes (or fails), it POSTs JSON to `CALLBACK_URL`. Large responses are split into ≤ 1.5 MiB chunks. Each chunk is independently HMAC-signed with the same scheme as inbound requests (`X-Signature` + `X-Timestamp` headers).
 
+`response` and `error` are mutually exclusive — exactly one is present in every chunk.
+
+**Success / OpenRouter response**
+
 ```jsonc
 {
   "requestId": "caller-assigned-id",
   "instanceId": "<workflow-instance-id>",
-  "ok": true,                              // false on any error phase
-  "phase": "openrouter_response",          // see phases below
-  "status": 200,                           // HTTP status from OpenRouter, or null
-  "headers": { "content-type": "application/json", ... }, // filtered OpenRouter response headers, or null
-  "body": "...",                           // response body chunk (may be truncated), or null
-  "error": null,                           // error string on failure phases, otherwise null
-  "truncated": false,                      // true if any reasoning field was truncated
   "timestamp": 1715000000,                 // unix seconds at send time
-  "chunkIndex": 0,                         // 0-based index of this chunk
-  "chunkTotal": 1                          // total number of chunks for this response
+  "chunk": { "index": 0, "total": 1 },     // chunk position (total > 1 for large bodies)
+  "response": {
+    "status": 200,                         // HTTP status from OpenRouter
+    "headers": { "content-type": "application/json", ... }, // filtered response headers
+    "body": "..."                          // response body chunk; null when body is absent
+  }
 }
 ```
 
-**`phase` values**
+Check `response.status` to distinguish a successful reply (2xx) from an OpenRouter-level error (4xx / 5xx).
 
-| Phase                        | Meaning                                               |
-| ---------------------------- | ----------------------------------------------------- |
-| `openrouter_response`        | OpenRouter replied (check `ok` / `status` for errors) |
-| `openrouter_transport_error` | Network-level failure reaching OpenRouter             |
-| `decrypt_failed`             | Could not decrypt the caller-supplied API key         |
-| `internal_error`             | Unexpected error inside the workflow                  |
+**Error**
+
+```jsonc
+{
+  "requestId": "caller-assigned-id",
+  "instanceId": "<workflow-instance-id>",
+  "timestamp": 1715000000,
+  "chunk": { "index": 0, "total": 1 },
+  "error": {
+    "type": "transport_error",             // see error types below
+    "message": "fetch failed: ..."
+  }
+}
+```
+
+**`error.type` values**
+
+| Type               | Meaning                                           |
+| ------------------ | ------------------------------------------------- |
+| `decrypt_failed`   | Could not decrypt the caller-supplied API key     |
+| `transport_error`  | Network-level failure reaching OpenRouter         |
+| `internal_error`   | Unexpected error inside the workflow              |
 
 Delivery is retried up to **5 times** with exponential backoff starting at **5 seconds**. If all retries are exhausted for any chunk, the workflow enters the `errored` state.
 

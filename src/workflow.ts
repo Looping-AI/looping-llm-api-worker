@@ -43,28 +43,27 @@ export interface Params {
   truncateThinkingMaxChars: number;
 }
 
-type CallbackPhase =
-  | "openrouter_response"
-  | "decrypt_failed"
-  | "openrouter_transport_error"
-  | "internal_error";
+interface CallbackResponse {
+  status: number;
+  headers: Record<string, string>;
+  body: string | null;
+}
+
+interface CallbackError {
+  type: string;
+  message: string;
+}
 
 interface CallbackEnvelopeData {
   requestId: string;
   instanceId: string;
-  ok: boolean;
-  phase: CallbackPhase;
-  status: number | null;
-  headers: Record<string, string> | null;
-  body: string | null;
-  error: string | null;
-  truncated: boolean;
+  response?: CallbackResponse;
+  error?: CallbackError;
 }
 
 interface CallbackEnvelope extends CallbackEnvelopeData {
   timestamp: number;
-  chunkIndex: number;
-  chunkTotal: number;
+  chunk: { index: number; total: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -118,13 +117,7 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
           await this.sendWithRetry({
             requestId,
             instanceId,
-            ok: false,
-            phase: "decrypt_failed",
-            status: null,
-            headers: null,
-            body: null,
-            error: String(e),
-            truncated: false,
+            error: { type: "decrypt_failed", message: String(e) },
           });
           return null;
         }
@@ -157,52 +150,37 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
           transportError = String(e);
         }
 
-        // Truncate reasoning fields before sending.
-        let truncated = false;
         if (bodyText !== null) {
-          const result = truncateReasoning(
+          bodyText = truncateReasoning(
             bodyText,
             truncateThinkingMaxChars ?? DEFAULT_THINKING_TRUNCATE,
-          );
-          bodyText = result.text;
-          truncated = result.truncated;
+          ).text;
         }
 
-        const phase: CallbackPhase =
-          transportError !== null
-            ? "openrouter_transport_error"
-            : "openrouter_response";
-
-        const ok =
-          phase === "openrouter_response" &&
-          status !== null &&
-          status >= 200 &&
-          status < 300;
-
-        await this.sendWithRetry({
-          requestId,
-          instanceId,
-          ok,
-          phase,
-          status,
-          headers: responseHeaders,
-          body: bodyText,
-          error: transportError,
-          truncated,
-        });
+        if (transportError !== null) {
+          await this.sendWithRetry({
+            requestId,
+            instanceId,
+            error: { type: "transport_error", message: transportError },
+          });
+        } else {
+          await this.sendWithRetry({
+            requestId,
+            instanceId,
+            response: {
+              status: status!,
+              headers: responseHeaders!,
+              body: bodyText,
+            },
+          });
+        }
       });
     } catch (e) {
       // Best-effort: attempt to notify the caller before the workflow errors.
       await this.sendBestEffort({
         requestId,
         instanceId,
-        ok: false,
-        phase: "internal_error",
-        status: null,
-        headers: null,
-        body: null,
-        error: String(e),
-        truncated: false,
+        error: { type: "internal_error", message: String(e) },
       });
       throw e;
     }
@@ -219,16 +197,18 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
    */
   private async sendWithRetry(data: CallbackEnvelopeData): Promise<void> {
     const chunks = splitBodyIntoChunks(
-      data.body,
+      data.response?.body ?? null,
       CALLBACK_BODY_CHUNK_MAX_BYTES,
     );
     for (let i = 0; i < chunks.length; i++) {
       const envelope: CallbackEnvelope = {
         ...data,
-        body: chunks[i],
+        response:
+          data.response !== undefined
+            ? { ...data.response, body: chunks[i] }
+            : undefined,
         timestamp: Math.floor(Date.now() / 1000),
-        chunkIndex: i,
-        chunkTotal: chunks.length,
+        chunk: { index: i, total: chunks.length },
       };
       await retryWithBackoff(
         () => this.postCallback(envelope),
@@ -245,16 +225,18 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
    */
   private async sendBestEffort(data: CallbackEnvelopeData): Promise<void> {
     const chunks = splitBodyIntoChunks(
-      data.body,
+      data.response?.body ?? null,
       CALLBACK_BODY_CHUNK_MAX_BYTES,
     );
     for (let i = 0; i < chunks.length; i++) {
       const envelope: CallbackEnvelope = {
         ...data,
-        body: chunks[i],
+        response:
+          data.response !== undefined
+            ? { ...data.response, body: chunks[i] }
+            : undefined,
         timestamp: Math.floor(Date.now() / 1000),
-        chunkIndex: i,
-        chunkTotal: chunks.length,
+        chunk: { index: i, total: chunks.length },
       };
       try {
         await this.postCallback(envelope);

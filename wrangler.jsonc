@@ -18,8 +18,8 @@
     },
   ],
   "upload_source_maps": true,
-  "vars": {
-    "CALLBACK_URL": "",
+  "secrets": {
+    "required": ["CALLBACK_URL", "SHARED_SECRET"],
   },
   "compatibility_flags": ["nodejs_compat"],
   /**

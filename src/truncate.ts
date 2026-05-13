@@ -65,6 +65,7 @@ export function truncateReasoning(
 import { z } from "zod";
 
 function truncateString(s: string, max: number): string {
+  if (max < 5) return s.slice(0, max);
   const half = Math.floor((max - 3) / 2);
   return s.slice(0, half) + "..." + s.slice(s.length - half);
 }

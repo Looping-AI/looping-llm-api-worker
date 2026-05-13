@@ -5,4 +5,5 @@
  */
 interface Env {
   SHARED_SECRET: string;
+  CALLBACK_URL: string;
 }

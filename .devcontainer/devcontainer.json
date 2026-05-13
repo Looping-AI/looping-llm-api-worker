@@ -1,0 +1,12 @@
+{
+  "name": "looping-llm-api-worker",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    // Node version — keep manually in sync with the node-version used in .github/workflows/
+    // (devcontainer.json does not support shell variable substitution)
+    "ghcr.io/devcontainers/features/node:1": { "version": "24" },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteUser": "vscode"
+}

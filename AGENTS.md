@@ -2,6 +2,10 @@
 
 STOP. Your knowledge of Cloudflare Workers APIs and limits may be outdated. Always retrieve current documentation before any Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, AI, or Agents SDK task.
 
+## Package Manager
+
+This project uses **Bun**. NEVER use `npm`. All install, run, and exec commands must use `bun` / `bunx`.
+
 ## Docs
 
 - https://developers.cloudflare.com/workers/

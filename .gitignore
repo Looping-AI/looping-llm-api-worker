@@ -179,6 +179,3 @@ dist
 # Auto-generated files
 
 worker-configuration.d.ts
-
-# tmp
-hello-worker/

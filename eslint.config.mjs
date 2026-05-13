@@ -12,6 +12,7 @@ export default [
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: "module",
+        project: true,
       },
     },
     rules: {
@@ -20,6 +21,7 @@ export default [
         "error",
         { argsIgnorePattern: "^_" },
       ],
+      "@typescript-eslint/no-deprecated": "error",
     },
   },
 ];

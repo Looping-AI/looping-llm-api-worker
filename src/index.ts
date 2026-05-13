@@ -1,5 +1,5 @@
+import { z } from "zod";
 import { verifyInboundSignature } from "./auth";
-import type { EncryptedApiKey } from "./crypto";
 import { DEFAULT_THINKING_TRUNCATE } from "./truncate";
 import type { Params } from "./workflow";
 
@@ -91,77 +91,41 @@ async function handleRelay(req: Request, env: Env): Promise<Response> {
 // Body validation
 // ---------------------------------------------------------------------------
 
-interface ValidBody {
+const BodySchema = z.object({
+  requestId: z.string().min(1),
+  openrouter: z.looseObject({ messages: z.array(z.unknown()) }),
+  encryptedApiKey: z.object({ iv: z.string(), ct: z.string() }),
+  truncate_thinking_to_max_chars: z.int().positive().optional().nullable(),
+});
+
+type ValidBody = {
   requestId: string;
   openrouter: Record<string, unknown>;
-  encryptedApiKey: EncryptedApiKey;
+  encryptedApiKey: { iv: string; ct: string };
   truncateThinkingMaxChars: number;
-}
+};
 
 type ValidationResult =
   | { ok: true; data: ValidBody }
   | { ok: false; reason: string };
 
 function validateBody(raw: unknown): ValidationResult {
-  if (typeof raw !== "object" || raw === null) {
-    return { ok: false, reason: "body must be a JSON object" };
-  }
-  const b = raw as Record<string, unknown>;
-
-  if (typeof b.requestId !== "string" || b.requestId.length === 0) {
-    return { ok: false, reason: "requestId must be a non-empty string" };
-  }
-
-  if (
-    typeof b.openrouter !== "object" ||
-    b.openrouter === null ||
-    !Array.isArray((b.openrouter as Record<string, unknown>).messages)
-  ) {
+  const result = BodySchema.safeParse(raw);
+  if (!result.success) {
     return {
       ok: false,
-      reason: "openrouter must be an object with a messages array",
+      reason: result.error.issues[0]?.message ?? "invalid body",
     };
   }
-
-  const eak = b.encryptedApiKey;
-  if (
-    typeof eak !== "object" ||
-    eak === null ||
-    typeof (eak as Record<string, unknown>).iv !== "string" ||
-    typeof (eak as Record<string, unknown>).ct !== "string"
-  ) {
-    return {
-      ok: false,
-      reason: "encryptedApiKey must be an object with iv and ct strings",
-    };
-  }
-
-  let truncateThinkingMaxChars = DEFAULT_THINKING_TRUNCATE;
-  if (
-    b.truncate_thinking_to_max_chars !== undefined &&
-    b.truncate_thinking_to_max_chars !== null
-  ) {
-    if (
-      typeof b.truncate_thinking_to_max_chars !== "number" ||
-      !Number.isInteger(b.truncate_thinking_to_max_chars) ||
-      b.truncate_thinking_to_max_chars <= 0
-    ) {
-      return {
-        ok: false,
-        reason:
-          "truncate_thinking_to_max_chars must be a positive integer or null",
-      };
-    }
-    truncateThinkingMaxChars = b.truncate_thinking_to_max_chars;
-  }
-
+  const { truncate_thinking_to_max_chars, ...rest } = result.data;
   return {
     ok: true,
     data: {
-      requestId: b.requestId as string,
-      openrouter: b.openrouter as Record<string, unknown>,
-      encryptedApiKey: eak as EncryptedApiKey,
-      truncateThinkingMaxChars,
+      requestId: rest.requestId,
+      openrouter: rest.openrouter,
+      encryptedApiKey: rest.encryptedApiKey,
+      truncateThinkingMaxChars:
+        truncate_thinking_to_max_chars ?? DEFAULT_THINKING_TRUNCATE,
     },
   };
 }

@@ -62,27 +62,31 @@ export function truncateReasoning(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+import { z } from "zod";
+
 function truncateString(s: string, max: number): string {
   const half = Math.floor((max - 3) / 2);
   return s.slice(0, half) + "..." + s.slice(s.length - half);
 }
 
-type OpenAiMessage = {
-  reasoning?: string;
-  reasoning_details?: Array<{ text?: string; summary?: string }>;
-  [key: string]: unknown;
-};
+const OpenAiMessageSchema = z.looseObject({
+  reasoning: z.string().optional(),
+  reasoning_details: z
+    .array(
+      z.looseObject({
+        text: z.string().optional(),
+        summary: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
 
-type OpenAiStyleResponse = {
-  choices: Array<{ message: OpenAiMessage; [key: string]: unknown }>;
-  [key: string]: unknown;
-};
+const OpenAiStyleResponseSchema = z.looseObject({
+  choices: z.array(z.looseObject({ message: OpenAiMessageSchema })),
+});
+
+type OpenAiStyleResponse = z.infer<typeof OpenAiStyleResponseSchema>;
 
 function isOpenAiStyleResponse(v: unknown): v is OpenAiStyleResponse {
-  return (
-    typeof v === "object" &&
-    v !== null &&
-    "choices" in v &&
-    Array.isArray((v as Record<string, unknown>).choices)
-  );
+  return OpenAiStyleResponseSchema.safeParse(v).success;
 }

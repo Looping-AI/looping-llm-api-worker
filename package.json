@@ -6,11 +6,14 @@
 		"deploy": "wrangler deploy",
 		"start": "wrangler dev",
 		"dev": "wrangler dev",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"test": "vitest run"
 	},
 	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.16.4",
 		"@types/node": "^25.7.0",
-		"typescript": "^5.0.4",
+		"typescript": "^6.0.3",
+		"vitest": "~4.1.6",
 		"wrangler": "^4.90.1"
 	}
 }

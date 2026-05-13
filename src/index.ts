@@ -6,7 +6,7 @@ import type { Params } from "./workflow";
 export { LlmRelayWorkflow } from "./workflow";
 
 export default {
-	async fetch(req: Request, env: Env): Promise<Response> {
+	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const { method, url } = req;
 		const { pathname } = new URL(url);
 

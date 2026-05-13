@@ -212,19 +212,19 @@ Check `response.status` to distinguish a successful reply (2xx) from an OpenRout
   "timestamp": 1715000000,
   "chunk": { "index": 0, "total": 1 },
   "error": {
-    "type": "transport_error",             // see error types below
-    "message": "fetch failed: ..."
-  }
+    "type": "transport_error", // see error types below
+    "message": "fetch failed: ...",
+  },
 }
 ```
 
 **`error.type` values**
 
-| Type               | Meaning                                           |
-| ------------------ | ------------------------------------------------- |
-| `decrypt_failed`   | Could not decrypt the caller-supplied API key     |
-| `transport_error`  | Network-level failure reaching OpenRouter         |
-| `internal_error`   | Unexpected error inside the workflow              |
+| Type              | Meaning                                       |
+| ----------------- | --------------------------------------------- |
+| `decrypt_failed`  | Could not decrypt the caller-supplied API key |
+| `transport_error` | Network-level failure reaching OpenRouter     |
+| `internal_error`  | Unexpected error inside the workflow          |
 
 Delivery is retried up to **5 times** with exponential backoff starting at **5 seconds**. If all retries are exhausted for any chunk, the workflow enters the `errored` state.
 

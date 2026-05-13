@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
+import {
+  createExecutionContext,
+  waitOnExecutionContext,
+} from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { makeSignedRequest, TEST_SECRET } from "./helpers";
 import { signOutbound } from "../src/auth";
@@ -26,7 +29,10 @@ const VALID_BODY = JSON.stringify({
 // Helper: dispatch a fetch to the worker using Miniflare bindings
 // ---------------------------------------------------------------------------
 
-async function doFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+async function doFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
   const req = input instanceof Request ? input : new Request(input, init);
   const ctx = createExecutionContext();
   const resp = await worker.fetch(req, env as Env, ctx);

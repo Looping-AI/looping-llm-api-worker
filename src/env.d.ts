@@ -4,5 +4,5 @@
  * the generated worker-configuration.d.ts.
  */
 interface Env {
-	SHARED_SECRET: string;
+  SHARED_SECRET: string;
 }

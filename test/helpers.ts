@@ -4,9 +4,9 @@ import { signOutbound } from "../src/auth";
 export const TEST_SECRET = "test-secret";
 
 export interface RequestOverrides {
-	signature?: string;
-	timestamp?: number | string;
-	contentType?: string;
+  signature?: string;
+  timestamp?: number | string;
+  contentType?: string;
 }
 
 /**
@@ -14,20 +14,23 @@ export interface RequestOverrides {
  * Override individual headers to exercise rejection branches.
  */
 export async function makeSignedRequest(
-	body: string,
-	overrides: RequestOverrides = {},
+  body: string,
+  overrides: RequestOverrides = {},
 ): Promise<Request> {
-	const { signature, timestamp, contentType = "application/json" } = overrides;
+  const { signature, timestamp, contentType = "application/json" } = overrides;
 
-	const { signature: sig, timestamp: ts } = await signOutbound(body, TEST_SECRET);
+  const { signature: sig, timestamp: ts } = await signOutbound(
+    body,
+    TEST_SECRET,
+  );
 
-	const headers = new Headers({ "content-type": contentType });
-	headers.set("x-signature", signature ?? sig);
-	headers.set("x-timestamp", String(timestamp ?? ts));
+  const headers = new Headers({ "content-type": contentType });
+  headers.set("x-signature", signature ?? sig);
+  headers.set("x-timestamp", String(timestamp ?? ts));
 
-	return new Request("http://localhost/relay", {
-		method: "POST",
-		headers,
-		body,
-	});
+  return new Request("http://localhost/relay", {
+    method: "POST",
+    headers,
+    body,
+  });
 }

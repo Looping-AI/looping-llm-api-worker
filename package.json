@@ -1,19 +1,25 @@
 {
-	"name": "my-worker",
-	"version": "0.0.0",
-	"private": true,
-	"scripts": {
-		"deploy": "wrangler deploy",
-		"start": "wrangler dev",
-		"dev": "wrangler dev",
-		"cf-typegen": "wrangler types",
-		"test": "vitest run"
-	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.16.4",
-		"@types/node": "^25.7.0",
-		"typescript": "^6.0.3",
-		"vitest": "~4.1.6",
-		"wrangler": "^4.90.1"
-	}
+  "name": "looping-llm-api-worker",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev",
+    "dev": "wrangler dev",
+    "cf-typegen": "wrangler types",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.4",
+    "@types/node": "^25.7.0",
+    "eslint": "^10.3.0",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "~4.1.6",
+    "wrangler": "^4.90.1"
+  }
 }

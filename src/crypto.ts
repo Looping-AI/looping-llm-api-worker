@@ -11,6 +11,8 @@ interface KeyCache {
   aes: CryptoKey;
 }
 
+export const HKDF_INFO = "openrouter-key-v1";
+
 let _cache: KeyCache | null = null;
 
 /** Returns the per-isolate cached key pair, or null if not yet initialised. */
@@ -50,7 +52,7 @@ export async function setKeys(secret: string): Promise<KeyCache> {
       name: "HKDF",
       hash: "SHA-256",
       salt: new Uint8Array(0),
-      info: new TextEncoder().encode("openrouter-key-v1"),
+      info: new TextEncoder().encode(HKDF_INFO),
     },
     hkdfBase,
     { name: "AES-GCM", length: 256 },

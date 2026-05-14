@@ -25,15 +25,6 @@ const RETRYABLE = new Set([
   408, 409, 425, 429, 500, 502, 503, 504, 520, 522, 524,
 ]);
 
-// Shared retry config for all callback-delivery steps.
-const CALLBACK_STEP_CONFIG = {
-  retries: {
-    limit: 3,
-    delay: "5 seconds" as const,
-    backoff: "exponential" as const,
-  },
-};
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -108,6 +99,14 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
       this.env.CALLBACK_URL,
       this.env.SHARED_SECRET,
     );
+
+    // Retry delay: number (ms) from env in tests; "5 seconds" string in production.
+    const retryDelay = this.env.STEP_RETRY_DELAY
+      ? Number(this.env.STEP_RETRY_DELAY)
+      : ("5 seconds" as const);
+    const CALLBACK_STEP_CONFIG = {
+      retries: { limit: 3, delay: retryDelay, backoff: "exponential" as const },
+    };
 
     // ------------------------------------------------------------------
     // Step 1: decrypt the OpenRouter API key

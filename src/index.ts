@@ -28,7 +28,8 @@ export default {
 
 async function handleRelay(req: Request, env: Env): Promise<Response> {
   if (
-    req.headers.get("content-type")?.split(";")[0].trim() !== "application/json"
+    req.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !==
+    "application/json"
   ) {
     return new Response("Unsupported Media Type", { status: 415 });
   }

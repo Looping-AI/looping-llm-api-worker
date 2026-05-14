@@ -153,33 +153,40 @@ describe("LlmRelayWorkflow", () => {
       error: { message: "Service Unavailable" },
     });
     fetchSpy
-      // 4 OpenRouter 503 responses: 1 initial attempt + 3 retries
-      .mockResolvedValueOnce(
-        new Response(errorBody, {
-          status: 503,
-          headers: { "content-type": "application/json" },
-        }),
+      // 4 OpenRouter 503 responses: 1 initial attempt + 3 retries.
+      // Use mockImplementationOnce so each Response is created lazily inside
+      // the step's request context — pre-created Response bodies cannot be
+      // read across Miniflare's per-retry context boundaries.
+      .mockImplementationOnce(
+        async () =>
+          new Response(errorBody, {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          }),
       )
-      .mockResolvedValueOnce(
-        new Response(errorBody, {
-          status: 503,
-          headers: { "content-type": "application/json" },
-        }),
+      .mockImplementationOnce(
+        async () =>
+          new Response(errorBody, {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          }),
       )
-      .mockResolvedValueOnce(
-        new Response(errorBody, {
-          status: 503,
-          headers: { "content-type": "application/json" },
-        }),
+      .mockImplementationOnce(
+        async () =>
+          new Response(errorBody, {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          }),
       )
-      .mockResolvedValueOnce(
-        new Response(errorBody, {
-          status: 503,
-          headers: { "content-type": "application/json" },
-        }),
+      .mockImplementationOnce(
+        async () =>
+          new Response(errorBody, {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          }),
       )
       // callback delivery
-      .mockResolvedValueOnce(new Response("", { status: 200 }));
+      .mockImplementationOnce(async () => new Response("", { status: 200 }));
 
     const encryptedApiKey = await encryptApiKey("sk-or-test-key");
     const introspector = await introspectWorkflow(env.LLM_RELAY);
@@ -215,11 +222,14 @@ describe("LlmRelayWorkflow", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy
       // 1 OpenRouter 400 — no retries
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: "Bad Request" }), { status: 400 }),
+      .mockImplementationOnce(
+        async () =>
+          new Response(JSON.stringify({ error: "Bad Request" }), {
+            status: 400,
+          }),
       )
       // callback delivery
-      .mockResolvedValueOnce(new Response("", { status: 200 }));
+      .mockImplementationOnce(async () => new Response("", { status: 200 }));
 
     const encryptedApiKey = await encryptApiKey("sk-or-test-key");
     const introspector = await introspectWorkflow(env.LLM_RELAY);

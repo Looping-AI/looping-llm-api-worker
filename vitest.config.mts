@@ -9,6 +9,8 @@ export default defineConfig({
         bindings: {
           SHARED_SECRET: "test-secret",
           CALLBACK_URL: "https://test-callback.invalid/cb",
+          // 100 ms between retries so retry tests complete in ~700 ms instead of 35 s.
+          STEP_RETRY_DELAY: "100",
         },
       },
     }),

@@ -6,6 +6,7 @@ import {
   verifyHmac,
   decryptApiKey,
   b64encode,
+  HKDF_INFO,
 } from "../src/crypto";
 
 const SECRET = "test-secret";
@@ -84,7 +85,7 @@ describe("decryptApiKey", () => {
             name: "HKDF",
             hash: "SHA-256",
             salt: new Uint8Array(0),
-            info: new TextEncoder().encode("openrouter-key-v1"),
+            info: new TextEncoder().encode(HKDF_INFO),
           },
           await crypto.subtle.importKey(
             "raw",

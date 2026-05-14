@@ -18,9 +18,6 @@
     },
   ],
   "upload_source_maps": true,
-  "secrets": {
-    "required": ["CALLBACK_URL", "SHARED_SECRET"],
-  },
   "compatibility_flags": ["nodejs_compat"],
   /**
    * Smart Placement

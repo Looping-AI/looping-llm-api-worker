@@ -37,7 +37,6 @@ const ALLOWED_HEADER_PREFIXES = [
 // ---------------------------------------------------------------------------
 
 export interface Params {
-  requestId: string;
   openrouterPayload: Record<string, unknown>;
   encryptedApiKey: EncryptedApiKey;
   truncateThinkingMaxChars: number;
@@ -56,7 +55,6 @@ interface CallbackError {
 
 interface CallbackEnvelopeData {
   requestId: string;
-  instanceId: string;
   response?: CallbackResponse;
   error?: CallbackError;
 }
@@ -95,13 +93,9 @@ interface CallbackEnvelope extends CallbackEnvelopeData {
  */
 export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
-    const {
-      requestId,
-      openrouterPayload,
-      encryptedApiKey,
-      truncateThinkingMaxChars,
-    } = event.payload;
-    const instanceId = event.instanceId;
+    const { openrouterPayload, encryptedApiKey, truncateThinkingMaxChars } =
+      event.payload;
+    const requestId = event.instanceId;
 
     try {
       // ------------------------------------------------------------------
@@ -116,7 +110,6 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
           // the outer run() to exit cleanly by returning null.
           await this.sendWithRetry({
             requestId,
-            instanceId,
             error: { type: "decrypt_failed", message: String(e) },
           });
           return null;
@@ -160,13 +153,11 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
         if (transportError !== null) {
           await this.sendWithRetry({
             requestId,
-            instanceId,
             error: { type: "transport_error", message: transportError },
           });
         } else {
           await this.sendWithRetry({
             requestId,
-            instanceId,
             response: {
               status: status!,
               headers: responseHeaders!,
@@ -179,7 +170,6 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
       // Best-effort: attempt to notify the caller before the workflow errors.
       await this.sendBestEffort({
         requestId,
-        instanceId,
         error: { type: "internal_error", message: String(e) },
       });
       throw e;

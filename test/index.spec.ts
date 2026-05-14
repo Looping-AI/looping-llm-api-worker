@@ -167,6 +167,42 @@ describe("POST /relay - body validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /relay - success", () => {
+  it("deduplicates: three identical requests create only one workflow instance", async () => {
+    // Simulate Cloudflare Workflows idempotency: same id → same instance,
+    // no new creation. Track how many distinct instances were ever created.
+    const instances = new Map<string, { id: string }>();
+    let newInstanceCount = 0;
+
+    const mockEnv = {
+      SHARED_SECRET: TEST_SECRET,
+      CALLBACK_URL: "https://test-callback.invalid/cb",
+      LLM_RELAY: {
+        create: async ({ id }: { id: string }) => {
+          if (!instances.has(id)) {
+            newInstanceCount++;
+            instances.set(id, { id });
+          }
+          return instances.get(id)!;
+        },
+      },
+    };
+
+    for (let i = 0; i < 3; i++) {
+      const req = await makeSignedRequest(VALID_BODY);
+      const ctx = createExecutionContext();
+      const resp = await worker.fetch(req, mockEnv as unknown as Env, ctx);
+      await waitOnExecutionContext(ctx);
+
+      expect(resp.status).toBe(202);
+      const json = (await resp.json()) as { ok: boolean; requestId: string };
+      expect(json.ok).toBe(true);
+      expect(json.requestId).toBe("req-001");
+    }
+
+    // All three requests carried the same requestId → only one instance created.
+    expect(newInstanceCount).toBe(1);
+  });
+
   it("returns 202 with ok, instanceId, requestId for a valid request", async () => {
     // Use unit style (direct worker.fetch) with a stubbed LLM_RELAY binding so
     // no real Workflow is created and Miniflare isolated storage stays clean.
@@ -186,11 +222,9 @@ describe("POST /relay - success", () => {
     expect(resp.status).toBe(202);
     const json = (await resp.json()) as {
       ok: boolean;
-      instanceId: string;
       requestId: string;
     };
     expect(json.ok).toBe(true);
-    expect(json.instanceId).toBe("test-instance-id");
     expect(json.requestId).toBe("req-001");
   });
 });

@@ -67,24 +67,19 @@ async function handleRelay(req: Request, env: Env): Promise<Response> {
     validation.data;
 
   // Dispatch the workflow.
-  let instance: { id: string };
   try {
     const params: Params = {
-      requestId,
       openrouterPayload: openrouter,
       encryptedApiKey,
       truncateThinkingMaxChars,
     };
-    instance = await env.LLM_RELAY.create({ params });
+    await env.LLM_RELAY.create({ id: requestId, params });
   } catch (err) {
     console.error("[relay] failed to create workflow instance:", err);
     return new Response("Internal Server Error", { status: 500 });
   }
 
-  return Response.json(
-    { ok: true, instanceId: instance.id, requestId },
-    { status: 202 },
-  );
+  return Response.json({ ok: true, requestId }, { status: 202 });
 }
 
 // ---------------------------------------------------------------------------

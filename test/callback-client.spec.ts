@@ -1,53 +1,55 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CallbackClient, splitBodyIntoChunks } from "../src/callback-client";
+import {
+  CallbackClient,
+  splitBytesIntoBase64Chunks,
+} from "../src/callback-client";
 
 const CALLBACK_URL =
   process.env.TEST_CALLBACK_URL ?? "http://localhost/callback";
 const SHARED_SECRET = process.env.TEST_SHARED_SECRET ?? "test-secret";
 
-describe("splitBodyIntoChunks", () => {
-  it("returns [null] for a null body", () => {
-    expect(splitBodyIntoChunks(null, 100)).toEqual([null]);
+describe("splitBytesIntoBase64Chunks", () => {
+  it("returns [null] for null bytes", () => {
+    expect(splitBytesIntoBase64Chunks(null, 100)).toEqual([null]);
   });
 
-  it("returns a single chunk when body fits within maxBytes", () => {
-    expect(splitBodyIntoChunks("hello", 100)).toEqual(["hello"]);
+  it("returns a single base64 chunk when bytes fit within maxBytes", () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const result = splitBytesIntoBase64Chunks(bytes, 10);
+    expect(result.length).toBe(1);
+    expect(result[0]).toBe(Buffer.from(bytes).toString("base64"));
   });
 
-  it("splits a large body across multiple chunks", () => {
-    const body = "a".repeat(5);
-    const chunks = splitBodyIntoChunks(body, 2);
+  it("splits large bytes into multiple base64 chunks", () => {
+    const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+    const chunks = splitBytesIntoBase64Chunks(bytes, 2);
+    // [1,2], [3,4], [5] → 3 chunks
     expect(chunks.length).toBe(3);
-    expect(chunks.join("")).toBe(body);
-  });
-
-  it("does not split in the middle of a multi-byte character", () => {
-    // "é", "à", "ü" each encode to 2 bytes; maxBytes=3 must not break mid-char
-    const body = "éàü";
-    const chunks = splitBodyIntoChunks(body, 3);
-    for (const c of chunks) {
-      expect(c).not.toContain("\uFFFD");
-    }
-    expect(chunks.join("")).toBe(body);
+    // Concatenating decoded chunks must reproduce the original bytes
+    const decoded = Buffer.concat(
+      chunks.map((c) => Buffer.from(c as string, "base64")),
+    );
+    expect(new Uint8Array(decoded)).toEqual(bytes);
   });
 });
 
 describe("CallbackClient", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  describe("sendWithRetry()", () => {
+  describe("send()", () => {
     it("POSTs a signed envelope for a response payload", async () => {
       const fetchSpy = vi
         .spyOn(globalThis, "fetch")
         .mockResolvedValueOnce(new Response("", { status: 200 }));
 
+      const gzipBody = new Uint8Array([0x1f, 0x8b, 0x01, 0x02, 0x03]);
       const client = new CallbackClient(CALLBACK_URL, SHARED_SECRET);
-      await client.sendWithRetry({
+      await client.send({
         requestId: "req-123",
         response: {
           status: 200,
           headers: { "content-type": "application/json" },
-          body: "hello",
+          gzip_body: gzipBody,
         },
       });
 
@@ -63,7 +65,9 @@ describe("CallbackClient", () => {
       const payload = JSON.parse(init?.body as string);
       expect(payload.requestId).toBe("req-123");
       expect(payload.response.status).toBe(200);
-      expect(payload.response.body).toBe("hello");
+      expect(payload.response.gzip_body).toBe(
+        Buffer.from(gzipBody).toString("base64"),
+      );
       expect(payload.chunk).toEqual({ index: 0, total: 1 });
       expect(typeof payload.timestamp).toBe("number");
     });
@@ -74,7 +78,7 @@ describe("CallbackClient", () => {
         .mockResolvedValueOnce(new Response("", { status: 200 }));
 
       const client = new CallbackClient(CALLBACK_URL, SHARED_SECRET);
-      await client.sendWithRetry({
+      await client.send({
         requestId: "req-456",
         error: { type: "decrypt_failed", message: "bad key" },
       });
@@ -86,66 +90,42 @@ describe("CallbackClient", () => {
         message: "bad key",
       });
       expect(payload.response).toBeUndefined();
+      expect(payload.chunk).toEqual({ index: 0, total: 1 });
     });
 
-    it("sends one POST per chunk for a multi-chunk body", async () => {
+    it("sends one POST per chunk for a multi-chunk byte body", async () => {
       const fetchSpy = vi
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(new Response("", { status: 200 }));
 
-      // Build a body that is exactly 2 bytes over the chunk limit so it splits
-      // into two chunks.
-      const chunkSize = 3; // small limit for the test
-      const body = "a".repeat(chunkSize + 1); // 4 bytes → 2 chunks of 3 and 1
+      // Verify splitBytesIntoBase64Chunks produces multiple chunks at low limit
+      const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+      expect(splitBytesIntoBase64Chunks(bytes, 2).length).toBe(3);
 
-      // Reach into the module under test via a tiny subclass so we can pass a
-      // custom chunk size without altering the production constant.
-      const { splitBodyIntoChunks: split } =
-        await import("../src/callback-client");
-      const chunks = split(body, chunkSize);
-      expect(chunks.length).toBe(2);
-
-      // Use the real client with the real chunk constant; just verify that
-      // a body small enough to fit in one chunk produces exactly one POST.
+      // With the real client and real 1.5 MiB limit, small bytes fit in one POST
       const client = new CallbackClient(CALLBACK_URL, SHARED_SECRET);
-      await client.sendWithRetry({
+      await client.send({
         requestId: "req-chunk",
-        response: { status: 200, headers: {}, body: "hi" },
+        response: { status: 200, headers: {}, gzip_body: bytes },
       });
 
       expect(fetchSpy.mock.calls).toHaveLength(1);
       const payload = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
       expect(payload.chunk).toEqual({ index: 0, total: 1 });
     });
-  });
 
-  describe("sendBestEffort()", () => {
-    it("does not throw when the POST fails with a network error", async () => {
-      vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(
-        new TypeError("Network error"),
-      );
-
-      const client = new CallbackClient(CALLBACK_URL, SHARED_SECRET);
-      await expect(
-        client.sendBestEffort({
-          requestId: "req-999",
-          error: { type: "internal_error", message: "oops" },
-        }),
-      ).resolves.toBeUndefined();
-    });
-
-    it("does not throw when the callback returns non-2xx", async () => {
+    it("throws when the POST returns non-2xx", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response("", { status: 503 }),
       );
 
       const client = new CallbackClient(CALLBACK_URL, SHARED_SECRET);
       await expect(
-        client.sendBestEffort({
-          requestId: "req-999",
+        client.send({
+          requestId: "req-fail",
           error: { type: "internal_error", message: "oops" },
         }),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow("Callback POST returned 503");
     });
   });
 });

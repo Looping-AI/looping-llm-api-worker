@@ -4,11 +4,8 @@ import { signOutbound } from "./auth";
 // Constants
 // ---------------------------------------------------------------------------
 
-/** 1.5 MiB — maximum UTF-8 byte size of the `body` slice in each callback POST. */
-export const CALLBACK_BODY_CHUNK_MAX_BYTES = 1_572_864;
-
-const CALLBACK_MAX_RETRIES = 5;
-const CALLBACK_INITIAL_DELAY_MS = 5_000;
+/** 1.5 MiB — maximum raw-byte size of each gzip chunk sent per callback POST. */
+const CALLBACK_BODY_CHUNK_MAX_BYTES = 1_572_864;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -17,7 +14,8 @@ const CALLBACK_INITIAL_DELAY_MS = 5_000;
 export interface CallbackResponse {
   status: number;
   headers: Record<string, string>;
-  body: string | null;
+  /** Pre-compressed (gzipped) response body bytes produced by the workflow. */
+  gzip_body: Uint8Array | null;
 }
 
 export interface CallbackError {
@@ -31,7 +29,16 @@ export interface CallbackEnvelopeData {
   error?: CallbackError;
 }
 
-export interface CallbackEnvelope extends CallbackEnvelopeData {
+// Wire format — each POST carries exactly one chunk.
+interface WireEnvelope {
+  requestId: string;
+  response?: {
+    status: number;
+    headers: Record<string, string>;
+    /** Base64-encoded slice of the gzip stream. */
+    gzip_body: string | null;
+  };
+  error?: CallbackError;
   timestamp: number;
   chunk: { index: number; total: number };
 }
@@ -47,65 +54,42 @@ export class CallbackClient {
   ) {}
 
   /**
-   * Splits `data.body` into ≤1.5 MiB chunks and sends each chunk with a
-   * per-chunk exponential retry loop (5 attempts, starting at 5 s).
-   * Throws if any chunk exhausts all retries.
+   * For response payloads: splits `data.response.gzip_body` into ≤1.5 MiB
+   * raw-byte chunks, base64-encodes each, and POSTs them in order.
+   * For error payloads: sends a single POST with no chunking.
+   * Throws on any POST failure — the caller's step retry config handles retries.
    */
-  async sendWithRetry(data: CallbackEnvelopeData): Promise<void> {
-    const chunks = splitBodyIntoChunks(
-      data.response?.body ?? null,
+  async send(data: CallbackEnvelopeData): Promise<void> {
+    if (data.response === undefined) {
+      await this.postEnvelope({
+        requestId: data.requestId,
+        error: data.error,
+        timestamp: Math.floor(Date.now() / 1000),
+        chunk: { index: 0, total: 1 },
+      });
+      return;
+    }
+
+    const chunks = splitBytesIntoBase64Chunks(
+      data.response.gzip_body,
       CALLBACK_BODY_CHUNK_MAX_BYTES,
     );
     for (let i = 0; i < chunks.length; i++) {
-      const envelope: CallbackEnvelope = {
-        ...data,
-        response:
-          data.response !== undefined
-            ? { ...data.response, body: chunks[i] }
-            : undefined,
+      await this.postEnvelope({
+        requestId: data.requestId,
+        response: {
+          status: data.response.status,
+          headers: data.response.headers,
+          gzip_body: chunks[i],
+        },
         timestamp: Math.floor(Date.now() / 1000),
         chunk: { index: i, total: chunks.length },
-      };
-      await retryWithBackoff(
-        () => this.postCallback(envelope),
-        CALLBACK_MAX_RETRIES,
-        CALLBACK_INITIAL_DELAY_MS,
-      );
+      });
     }
   }
 
-  /**
-   * Attempts to send each chunk exactly once. Logs failures but does not
-   * throw. Used for error-phase callbacks where we can't add retries without
-   * risking cascading complexity.
-   */
-  async sendBestEffort(data: CallbackEnvelopeData): Promise<void> {
-    const chunks = splitBodyIntoChunks(
-      data.response?.body ?? null,
-      CALLBACK_BODY_CHUNK_MAX_BYTES,
-    );
-    for (let i = 0; i < chunks.length; i++) {
-      const envelope: CallbackEnvelope = {
-        ...data,
-        response:
-          data.response !== undefined
-            ? { ...data.response, body: chunks[i] }
-            : undefined,
-        timestamp: Math.floor(Date.now() / 1000),
-        chunk: { index: i, total: chunks.length },
-      };
-      try {
-        await this.postCallback(envelope);
-      } catch (err) {
-        console.error(
-          `[relay] best-effort callback chunk ${i}/${chunks.length} failed: ${err}`,
-        );
-      }
-    }
-  }
-
-  /** Signs and POSTs a single callback envelope. Throws on non-2xx. */
-  private async postCallback(envelope: CallbackEnvelope): Promise<void> {
+  /** Signs and POSTs a single wire envelope. Throws on non-2xx. */
+  private async postEnvelope(envelope: WireEnvelope): Promise<void> {
     const bodyStr = JSON.stringify(envelope);
     const { signature, timestamp } = await signOutbound(
       bodyStr,
@@ -121,7 +105,6 @@ export class CallbackClient {
       body: bodyStr,
     });
     if (!resp.ok) {
-      // Drain the body to free the connection before retrying.
       await resp.text().catch(() => {});
       throw new Error(`Callback POST returned ${resp.status}`);
     }
@@ -133,59 +116,23 @@ export class CallbackClient {
 // ---------------------------------------------------------------------------
 
 /**
- * Splits `body` into slices whose UTF-8 byte length does not exceed `maxBytes`.
- * Multi-byte characters are never split across chunk boundaries.
- * Returns `[null]` when `body` is null.
+ * Splits `bytes` into chunks whose raw byte length does not exceed `maxBytes`,
+ * and returns each chunk as a base64-encoded string.
+ * Returns `[null]` when `bytes` is null.
  */
-export function splitBodyIntoChunks(
-  body: string | null,
+export function splitBytesIntoBase64Chunks(
+  bytes: Uint8Array | null,
   maxBytes: number,
 ): (string | null)[] {
-  if (body === null) return [null];
+  if (bytes === null) return [null];
 
-  const encoder = new TextEncoder();
-  const encoded = encoder.encode(body);
-
-  if (encoded.length <= maxBytes) return [body];
-
-  const decoder = new TextDecoder();
   const chunks: string[] = [];
   let offset = 0;
-
-  while (offset < encoded.length) {
-    let end = Math.min(offset + maxBytes, encoded.length);
-    // Walk back to the start of a multi-byte sequence if we landed mid-char.
-    while (end > offset && (encoded[end] & 0xc0) === 0x80) {
-      end--;
-    }
-    chunks.push(decoder.decode(encoded.slice(offset, end)));
+  do {
+    const end = Math.min(offset + maxBytes, bytes.length);
+    chunks.push(Buffer.from(bytes.slice(offset, end)).toString("base64"));
     offset = end;
-  }
+  } while (offset < bytes.length);
 
   return chunks;
-}
-
-async function retryWithBackoff(
-  fn: () => Promise<void>,
-  maxAttempts: number,
-  initialDelayMs: number,
-): Promise<void> {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (attempt > 0) {
-      await delay(initialDelayMs * Math.pow(2, attempt - 1));
-    }
-    try {
-      await fn();
-      return;
-    } catch (err) {
-      if (attempt === maxAttempts - 1) throw err;
-      console.error(
-        `[relay] callback attempt ${attempt + 1}/${maxAttempts} failed, retrying: ${err}`,
-      );
-    }
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

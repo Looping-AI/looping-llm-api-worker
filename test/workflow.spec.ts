@@ -57,9 +57,12 @@ describe("LlmRelayWorkflow", () => {
 
       const callbackBody = JSON.parse(
         fetchSpy.mock.calls[1][1]?.body as string,
-      ) as { requestId: string; response: { status: number; body: string } };
+      ) as {
+        requestId: string;
+        response: { status: number; gzip_body: string };
+      };
       expect(callbackBody.response.status).toBe(200);
-      expect(typeof callbackBody.response.body).toBe("string");
+      expect(typeof callbackBody.response.gzip_body).toBe("string");
     } finally {
       await introspector.dispose();
     }

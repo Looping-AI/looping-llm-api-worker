@@ -15,5 +15,6 @@ export default defineConfig({
   ],
   test: {
     include: ["test/**/*.spec.ts"],
+    globalSetup: ["./test/setup/global-setup.ts"],
   },
 });

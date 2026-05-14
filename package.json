@@ -7,10 +7,12 @@
     "start": "wrangler dev",
     "dev": "wrangler dev",
     "cf-typegen": "wrangler types",
-    "lint": "eslint .",
+    "lint": "eslint . && bun run lint:tsc",
+    "lint:tsc": "bunx tsc --noEmit && bunx tsc -p test --noEmit && bunx tsc -p test/setup --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:record": "RECORD=1 vitest run",
     "prepare": "husky"
   },
   "devDependencies": {

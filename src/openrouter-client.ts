@@ -13,11 +13,7 @@ export interface OpenRouterSuccess {
   body: string;
 }
 
-export interface OpenRouterTransportError {
-  transportError: string;
-}
-
-export type OpenRouterResult = OpenRouterSuccess | OpenRouterTransportError;
+export type OpenRouterResult = OpenRouterSuccess;
 
 export function extractAllowedHeaders(
   headers: Headers,
@@ -38,22 +34,18 @@ export class OpenRouterClient {
   constructor(private readonly apiKey: string) {}
 
   async complete(payload: Record<string, unknown>): Promise<OpenRouterResult> {
-    try {
-      const resp = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ...payload, stream: false }),
-      });
-      return {
-        status: resp.status,
-        headers: extractAllowedHeaders(resp.headers),
-        body: await resp.text(),
-      };
-    } catch (e) {
-      return { transportError: String(e) };
-    }
+    const resp = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ...payload, stream: false }),
+    });
+    return {
+      status: resp.status,
+      headers: extractAllowedHeaders(resp.headers),
+      body: await resp.text(),
+    };
   }
 }

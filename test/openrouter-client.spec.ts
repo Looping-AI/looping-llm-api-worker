@@ -39,9 +39,6 @@ describe("OpenRouterClient", () => {
           messages: [{ role: "user", content: "Say hello in one word." }],
         });
 
-        expect("transportError" in result).toBe(false);
-        if ("transportError" in result) return;
-
         expect(result.status).toBe(200);
         expect(result.headers).toHaveProperty("content-type");
         expect(typeof result.body).toBe("string");
@@ -61,20 +58,18 @@ describe("OpenRouterClient", () => {
       }
     });
 
-    it("returns transportError when the network call throws", async () => {
+    it("throws when the network call fails", async () => {
       vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(
         new TypeError("Network connection refused"),
       );
 
       const client = new OpenRouterClient("sk-test-key");
-      const result = await client.complete({
-        model: "openai/gpt-4o-mini",
-        messages: [{ role: "user", content: "hello" }],
-      });
-
-      expect("transportError" in result).toBe(true);
-      if (!("transportError" in result)) return;
-      expect(result.transportError).toContain("TypeError");
+      await expect(
+        client.complete({
+          model: "openai/gpt-4o-mini",
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      ).rejects.toThrow("Network connection refused");
     });
   });
 

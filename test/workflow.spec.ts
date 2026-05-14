@@ -109,9 +109,12 @@ describe("LlmRelayWorkflow", () => {
   it("sends transport_error callback when OpenRouter is unreachable", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy
-      // First call: OpenRouter — network failure
+      // 4 OpenRouter failures: 1 initial attempt + 3 retries
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
-      // Second call: callback delivery
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      // callback delivery
       .mockResolvedValueOnce(new Response("", { status: 200 }));
 
     const encryptedApiKey = await encryptApiKey("sk-or-test-key");
@@ -134,11 +137,116 @@ describe("LlmRelayWorkflow", () => {
       const [instance] = introspector.get();
       await instance.waitForStatus("complete");
 
+      expect(fetchSpy).toHaveBeenCalledTimes(5);
+      const callbackBody = JSON.parse(
+        fetchSpy.mock.calls[4][1]?.body as string,
+      ) as { error: { type: string } };
+      expect(callbackBody.error.type).toBe("transport_error");
+    } finally {
+      await introspector.dispose();
+    }
+  });
+
+  it("retries on retryable status and delivers response after exhaustion", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const errorBody = JSON.stringify({
+      error: { message: "Service Unavailable" },
+    });
+    fetchSpy
+      // 4 OpenRouter 503 responses: 1 initial attempt + 3 retries
+      .mockResolvedValueOnce(
+        new Response(errorBody, {
+          status: 503,
+          headers: { "content-type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(errorBody, {
+          status: 503,
+          headers: { "content-type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(errorBody, {
+          status: 503,
+          headers: { "content-type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(errorBody, {
+          status: 503,
+          headers: { "content-type": "application/json" },
+        }),
+      )
+      // callback delivery
+      .mockResolvedValueOnce(new Response("", { status: 200 }));
+
+    const encryptedApiKey = await encryptApiKey("sk-or-test-key");
+    const introspector = await introspectWorkflow(env.LLM_RELAY);
+
+    try {
+      const body = JSON.stringify({
+        requestId: crypto.randomUUID(),
+        openrouter: {
+          model: "openai/gpt-4o-mini",
+          messages: [{ role: "user", content: "hello" }],
+        },
+        encryptedApiKey,
+      });
+      const req = await makeSignedRequest(body);
+      const ctx = createExecutionContext();
+      await worker.fetch(req, env as Env, ctx);
+      await waitOnExecutionContext(ctx);
+
+      const [instance] = introspector.get();
+      await instance.waitForStatus("complete");
+
+      expect(fetchSpy).toHaveBeenCalledTimes(5);
+      const callbackBody = JSON.parse(
+        fetchSpy.mock.calls[4][1]?.body as string,
+      ) as { response: { status: number } };
+      expect(callbackBody.response.status).toBe(503);
+    } finally {
+      await introspector.dispose();
+    }
+  });
+
+  it("does not retry on non-retryable status and delivers response immediately", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy
+      // 1 OpenRouter 400 — no retries
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "Bad Request" }), { status: 400 }),
+      )
+      // callback delivery
+      .mockResolvedValueOnce(new Response("", { status: 200 }));
+
+    const encryptedApiKey = await encryptApiKey("sk-or-test-key");
+    const introspector = await introspectWorkflow(env.LLM_RELAY);
+
+    try {
+      const body = JSON.stringify({
+        requestId: crypto.randomUUID(),
+        openrouter: {
+          model: "openai/gpt-4o-mini",
+          messages: [{ role: "user", content: "hello" }],
+        },
+        encryptedApiKey,
+      });
+      const req = await makeSignedRequest(body);
+      const ctx = createExecutionContext();
+      await worker.fetch(req, env as Env, ctx);
+      await waitOnExecutionContext(ctx);
+
+      const [instance] = introspector.get();
+      await instance.waitForStatus("complete");
+
+      // 1 OpenRouter call (no retries) + 1 callback = 2 total
       expect(fetchSpy).toHaveBeenCalledTimes(2);
       const callbackBody = JSON.parse(
         fetchSpy.mock.calls[1][1]?.body as string,
-      ) as { error: { type: string } };
-      expect(callbackBody.error.type).toBe("transport_error");
+      ) as { response: { status: number } };
+      expect(callbackBody.response.status).toBe(400);
     } finally {
       await introspector.dispose();
     }

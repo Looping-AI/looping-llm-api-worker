@@ -103,7 +103,7 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
       // ------------------------------------------------------------------
       const apiKey = await step.do("decrypt-key", async () => {
         try {
-          const { aes } = getKeys() ?? await setKeys(this.env.SHARED_SECRET);
+          const { aes } = getKeys() ?? (await setKeys(this.env.SHARED_SECRET));
           return await decryptApiKey(aes, encryptedApiKey);
         } catch (e) {
           // Emit decrypt_failed callback with inline retries, then signal

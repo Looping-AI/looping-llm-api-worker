@@ -56,7 +56,7 @@ export async function verifyInboundSignature(
   }
   const hexSig = sigHeader.slice(prefix.length);
 
-  const { hmac } = getKeys() ?? await setKeys(secret);
+  const { hmac } = getKeys() ?? (await setKeys(secret));
   const message = `${ts}.${rawBody}`;
   const valid = await verifyHmac(hmac, message, hexSig);
 
@@ -84,7 +84,7 @@ export async function signOutbound(
   secret: string,
 ): Promise<OutboundSignature> {
   const timestamp = Math.floor(Date.now() / 1000);
-  const { hmac } = getKeys() ?? await setKeys(secret);
+  const { hmac } = getKeys() ?? (await setKeys(secret));
   const hex = await signHmac(hmac, `${timestamp}.${rawBody}`);
   return { signature: `sha256=${hex}`, timestamp };
 }

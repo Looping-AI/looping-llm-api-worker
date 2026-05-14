@@ -3,7 +3,7 @@ import {
   WorkflowEvent,
   WorkflowStep,
 } from "cloudflare:workers";
-import { getKeys, decryptApiKey } from "./crypto";
+import { getKeys, setKeys, decryptApiKey } from "./crypto";
 import { signOutbound } from "./auth";
 import { truncateReasoning, DEFAULT_THINKING_TRUNCATE } from "./truncate";
 import type { EncryptedApiKey } from "./crypto";
@@ -103,7 +103,7 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
       // ------------------------------------------------------------------
       const apiKey = await step.do("decrypt-key", async () => {
         try {
-          const { aes } = await getKeys(this.env.SHARED_SECRET);
+          const { aes } = getKeys() ?? await setKeys(this.env.SHARED_SECRET);
           return await decryptApiKey(aes, encryptedApiKey);
         } catch (e) {
           // Emit decrypt_failed callback with inline retries, then signal

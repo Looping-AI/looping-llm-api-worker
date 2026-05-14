@@ -9,7 +9,7 @@
  * Outbound uses the same scheme applied to the serialised callback body.
  */
 
-import { getKeys, signHmac, verifyHmac } from "./crypto";
+import { getKeys, setKeys, signHmac, verifyHmac } from "./crypto";
 
 /** Maximum allowed clock skew between caller and worker, in seconds. */
 export const MAX_TIMESTAMP_SKEW_SECONDS = 300;
@@ -56,7 +56,7 @@ export async function verifyInboundSignature(
   }
   const hexSig = sigHeader.slice(prefix.length);
 
-  const { hmac } = await getKeys(secret);
+  const { hmac } = getKeys() ?? await setKeys(secret);
   const message = `${ts}.${rawBody}`;
   const valid = await verifyHmac(hmac, message, hexSig);
 
@@ -84,7 +84,7 @@ export async function signOutbound(
   secret: string,
 ): Promise<OutboundSignature> {
   const timestamp = Math.floor(Date.now() / 1000);
-  const { hmac } = await getKeys(secret);
+  const { hmac } = getKeys() ?? await setKeys(secret);
   const hex = await signHmac(hmac, `${timestamp}.${rawBody}`);
   return { signature: `sha256=${hex}`, timestamp };
 }

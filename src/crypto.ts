@@ -13,8 +13,16 @@ interface KeyCache {
 
 let _cache: KeyCache | null = null;
 
-/** Returns the per-isolate cached key pair, deriving them on first call. */
-export async function getKeys(secret: string): Promise<KeyCache> {
+/** Returns the per-isolate cached key pair, or null if not yet initialised. */
+export function getKeys(): KeyCache | null {
+  return _cache;
+}
+
+/**
+ * Derives and caches the key pair from `secret` on first call.
+ * Subsequent calls return the existing cache without re-deriving.
+ */
+export async function setKeys(secret: string): Promise<KeyCache> {
   if (_cache) return _cache;
 
   const secretBytes = new TextEncoder().encode(secret);

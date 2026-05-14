@@ -4,7 +4,7 @@ import {
   signOutbound,
   MAX_TIMESTAMP_SKEW_SECONDS,
 } from "../src/auth";
-import { getKeys, signHmac } from "../src/crypto";
+import { setKeys, signHmac } from "../src/crypto";
 
 const SECRET = "test-secret";
 
@@ -73,7 +73,7 @@ describe("verifyInboundSignature - timestamp validation", () => {
   it("rejects timestamp too far in the past", async () => {
     const ts = Math.floor(Date.now() / 1000) - MAX_TIMESTAMP_SKEW_SECONDS - 1;
     // Sign with the stale timestamp to pass signature check, but timestamp check fires first
-    const { hmac } = await getKeys(SECRET);
+    const { hmac } = await setKeys(SECRET);
     const body = "stale-body";
     const hex = await signHmac(hmac, `${ts}.${body}`);
     const headers = makeHeaders({
@@ -87,7 +87,7 @@ describe("verifyInboundSignature - timestamp validation", () => {
 
   it("rejects timestamp too far in the future", async () => {
     const ts = Math.floor(Date.now() / 1000) + MAX_TIMESTAMP_SKEW_SECONDS + 1;
-    const { hmac } = await getKeys(SECRET);
+    const { hmac } = await setKeys(SECRET);
     const body = "future-body";
     const hex = await signHmac(hmac, `${ts}.${body}`);
     const headers = makeHeaders({
@@ -123,7 +123,7 @@ describe("verifyInboundSignature - signature format", () => {
 
 describe("verifyInboundSignature - signature mismatch", () => {
   it("rejects a valid-format signature that does not match the body", async () => {
-    const { hmac } = await getKeys(SECRET);
+    const { hmac } = await setKeys(SECRET);
     const ts = Math.floor(Date.now() / 1000);
     // Sign a different body
     const hex = await signHmac(hmac, `${ts}.other-body`);

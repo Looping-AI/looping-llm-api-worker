@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   getKeys,
+  setKeys,
   signHmac,
   verifyHmac,
   decryptApiKey,
@@ -13,18 +14,19 @@ const SECRET = "test-secret";
 // Key derivation + caching
 // ---------------------------------------------------------------------------
 
-describe("getKeys", () => {
+describe("getKeys / setKeys", () => {
   it("returns CryptoKeys for hmac and aes", async () => {
-    const keys = await getKeys(SECRET);
+    const keys = await setKeys(SECRET);
     expect(keys.hmac).toBeInstanceOf(CryptoKey);
     expect(keys.aes).toBeInstanceOf(CryptoKey);
   });
 
-  it("returns the same cached object on repeated calls", async () => {
-    const k1 = await getKeys(SECRET);
-    const k2 = await getKeys(SECRET);
-    expect(k1.hmac).toBe(k2.hmac);
-    expect(k1.aes).toBe(k2.aes);
+  it("getKeys() returns the cached object after setKeys()", async () => {
+    const k1 = await setKeys(SECRET);
+    const k2 = getKeys();
+    expect(k2).not.toBeNull();
+    expect(k1.hmac).toBe(k2!.hmac);
+    expect(k1.aes).toBe(k2!.aes);
   });
 });
 
@@ -34,27 +36,27 @@ describe("getKeys", () => {
 
 describe("signHmac / verifyHmac", () => {
   it("verifies a signature produced by signHmac", async () => {
-    const { hmac } = await getKeys(SECRET);
+    const { hmac } = await setKeys(SECRET);
     const hex = await signHmac(hmac, "hello world");
     const valid = await verifyHmac(hmac, "hello world", hex);
     expect(valid).toBe(true);
   });
 
   it("rejects a tampered message", async () => {
-    const { hmac } = await getKeys(SECRET);
+    const { hmac } = await setKeys(SECRET);
     const hex = await signHmac(hmac, "original");
     const valid = await verifyHmac(hmac, "tampered", hex);
     expect(valid).toBe(false);
   });
 
   it("rejects a malformed hex signature", async () => {
-    const { hmac } = await getKeys(SECRET);
+    const { hmac } = await setKeys(SECRET);
     const valid = await verifyHmac(hmac, "msg", "not-hex!!!");
     expect(valid).toBe(false);
   });
 
   it("rejects a truncated hex signature (wrong length)", async () => {
-    const { hmac } = await getKeys(SECRET);
+    const { hmac } = await setKeys(SECRET);
     const hex = await signHmac(hmac, "msg");
     const valid = await verifyHmac(hmac, "msg", hex.slice(0, 10));
     expect(valid).toBe(false);
@@ -67,7 +69,7 @@ describe("signHmac / verifyHmac", () => {
 
 describe("decryptApiKey", () => {
   it("round-trips: encrypt with SubtleCrypto then decryptApiKey", async () => {
-    const { aes } = await getKeys(SECRET);
+    const { aes } = await setKeys(SECRET);
 
     // Encrypt directly with SubtleCrypto so we have a valid ciphertext
     const plaintext = "sk-or-supersecretkey";
@@ -108,7 +110,7 @@ describe("decryptApiKey", () => {
   });
 
   it("throws on tampered ciphertext (GCM auth tag failure)", async () => {
-    const { aes } = await getKeys(SECRET);
+    const { aes } = await setKeys(SECRET);
 
     const iv = crypto.getRandomValues(new Uint8Array(12));
     // 20 bytes of garbage — not a valid GCM ciphertext+tag

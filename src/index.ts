@@ -76,6 +76,11 @@ async function handleRelay(req: Request, env: Env): Promise<Response> {
     };
     await env.LLM_RELAY.create({ id: requestId, params });
   } catch (err) {
+    // create() throws when an instance with the same ID already exists within
+    // its retention window. Treat this as an idempotent duplicate submission.
+    if (/already exists/i.test(String(err))) {
+      return Response.json({ ok: true, requestId }, { status: 202 });
+    }
     console.error("[relay] failed to create workflow instance:", err);
     return new Response("Internal Server Error", { status: 500 });
   }

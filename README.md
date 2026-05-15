@@ -8,12 +8,11 @@ A Cloudflare Workers async LLM relay. It accepts a signed `POST /relay` request,
 Caller                          Worker                       Workflow (async)
   │                               │                               │
   │── POST /relay (HMAC-signed) ──▶│                               │
-  │◀─────────── 202 + instanceId ──│                               │
+  │◀──────────── 202 + requestId ──│                               │
   │                               │── dispatch LlmRelayWorkflow ──▶│
   │                               │                               │── 1. decrypt API key (AES-256-GCM)
-  │                               │                               │── 2. POST to OpenRouter
-  │                               │                               │── 3. truncate reasoning fields
-  │                               │                               │── 4. POST callback (chunked, signed, 5× retry)
+  │                               │                               │── 2. POST to OpenRouter, truncate reasoning, gzip body
+  │                               │                               │── 3. POST callback (chunked, gzip, signed, 3× retry)
   │◀══════════ callback POST (HMAC-signed) ════════════════════════│
 ```
 
@@ -171,7 +170,6 @@ The signed message is `${X-Timestamp}.${rawBody}` (HMAC-SHA256 of the raw reques
 ```json
 {
   "ok": true,
-  "instanceId": "<workflow-instance-id>",
   "requestId": "<your-requestId>"
 }
 ```
@@ -191,13 +189,12 @@ Once the workflow completes (or fails), it POSTs JSON to `CALLBACK_URL`. Large r
 ```jsonc
 {
   "requestId": "caller-assigned-id",
-  "instanceId": "<workflow-instance-id>",
   "timestamp": 1715000000,                 // unix seconds at send time
   "chunk": { "index": 0, "total": 1 },     // chunk position (total > 1 for large bodies)
   "response": {
     "status": 200,                         // HTTP status from OpenRouter
     "headers": { "content-type": "application/json", ... }, // filtered response headers
-    "body": "..."                          // response body chunk; null when body is absent
+    "gzip_body": "..."                     // base64-encoded gzip slice of the response body; null when body is absent
   }
 }
 ```
@@ -209,7 +206,6 @@ Check `response.status` to distinguish a successful reply (2xx) from an OpenRout
 ```jsonc
 {
   "requestId": "caller-assigned-id",
-  "instanceId": "<workflow-instance-id>",
   "timestamp": 1715000000,
   "chunk": { "index": 0, "total": 1 },
   "error": {
@@ -227,7 +223,7 @@ Check `response.status` to distinguish a successful reply (2xx) from an OpenRout
 | `transport_error` | Network-level failure reaching OpenRouter     |
 | `internal_error`  | Unexpected error inside the workflow          |
 
-Delivery is retried up to **5 times** with exponential backoff starting at **5 seconds**. If all retries are exhausted for any chunk, the workflow enters the `errored` state.
+Delivery is retried up to **3 times** with exponential backoff starting at **5 seconds**. If all retries are exhausted for any chunk, the workflow enters the `errored` state.
 
 ---
 

@@ -83,12 +83,6 @@ function makeStream(
  *    Reads the stream, parses the header, then delivers the chunked gzip
  *    callback via CallbackClient.send(). Each chunk is a base64-encoded
  *    slice of the compressed body (≤1.5 MiB raw bytes per chunk).
- *
- * Outer try/catch
- * ───────────────
- * Any unexpected throw that escapes the steps is caught here; a single
- * `internal_error` callback is attempted (send failure swallowed) before
- * re-throwing so the Workflow ends in the `errored` state.
  */
 export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {

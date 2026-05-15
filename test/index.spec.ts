@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   createExecutionContext,
   waitOnExecutionContext,
@@ -167,63 +167,31 @@ describe("POST /relay - body validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST /relay - success", () => {
-  it("deduplicates: three identical requests create only one workflow instance", async () => {
-    // Simulate Cloudflare Workflows idempotency: same id → same instance,
-    // no new creation. Track how many distinct instances were ever created.
-    const instances = new Map<string, { id: string }>();
-    let newInstanceCount = 0;
+  afterEach(() => vi.restoreAllMocks());
 
-    const mockEnv = {
-      SHARED_SECRET: TEST_SECRET,
-      CALLBACK_URL: "https://test-callback.invalid/cb",
-      LLM_RELAY: {
-        create: async ({ id }: { id: string }) => {
-          if (!instances.has(id)) {
-            newInstanceCount++;
-            instances.set(id, { id });
-          }
-          return instances.get(id)!;
-        },
-      },
-    };
+  it("returns 202 with ok and requestId for a valid request", async () => {
+    vi.spyOn(env.LLM_RELAY, "create").mockResolvedValue(
+      {} as unknown as WorkflowInstance,
+    );
 
-    for (let i = 0; i < 3; i++) {
-      const req = await makeSignedRequest(VALID_BODY);
-      const ctx = createExecutionContext();
-      const resp = await worker.fetch(req, mockEnv as unknown as Env, ctx);
-      await waitOnExecutionContext(ctx);
-
-      expect(resp.status).toBe(202);
-      const json = (await resp.json()) as { ok: boolean; requestId: string };
-      expect(json.ok).toBe(true);
-      expect(json.requestId).toBe("req-001");
-    }
-
-    // All three requests carried the same requestId → only one instance created.
-    expect(newInstanceCount).toBe(1);
-  });
-
-  it("returns 202 with ok, instanceId, requestId for a valid request", async () => {
-    // Use unit style (direct worker.fetch) with a stubbed LLM_RELAY binding so
-    // no real Workflow is created and Miniflare isolated storage stays clean.
-    const mockEnv = {
-      SHARED_SECRET: TEST_SECRET,
-      CALLBACK_URL: "https://test-callback.invalid/cb",
-      LLM_RELAY: {
-        create: async () => ({ id: "test-instance-id" }),
-      },
-    };
-
-    const req = await makeSignedRequest(VALID_BODY);
-    const ctx = createExecutionContext();
-    const resp = await worker.fetch(req, mockEnv as unknown as Env, ctx);
-    await waitOnExecutionContext(ctx);
+    const resp = await doFetch(await makeSignedRequest(VALID_BODY));
 
     expect(resp.status).toBe(202);
-    const json = (await resp.json()) as {
-      ok: boolean;
-      requestId: string;
-    };
+    const json = (await resp.json()) as { ok: boolean; requestId: string };
+    expect(json.ok).toBe(true);
+    expect(json.requestId).toBe("req-001");
+  });
+
+  it("deduplicates: repeated requests with the same requestId return 202 idempotently", async () => {
+    // Miniflare doesn't enforce the duplicate-ID constraint that Cloudflare
+    // production does (create() throws "already exists"). Simulate it directly.
+    vi.spyOn(env.LLM_RELAY, "create").mockRejectedValue(
+      new Error("instance with id req-001 already exists"),
+    );
+
+    const resp = await doFetch(await makeSignedRequest(VALID_BODY));
+    expect(resp.status).toBe(202);
+    const json = (await resp.json()) as { ok: boolean; requestId: string };
     expect(json.ok).toBe(true);
     expect(json.requestId).toBe("req-001");
   });

@@ -1,36 +1,35 @@
-# Dependencies
+# Logs
+
+logs
+_.log
+*.log*
+
+# Runtime data
+
+pids
+_.pid
+_.seed
+\*.pid.lock
+
+# Dependency directories
+
 node_modules/
 
-# Wrangler
-.wrangler/
+# Wrangler local dev secrets — never commit
 
-# Environment / secrets
-.dev.vars
-.env
-.env.*
+.env*
 !.env.example
 
-# Build output
-dist/
-build/
+# wrangler project
 
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+.wrangler/
 
 # macOS
+
 .DS_Store
 
 # VSCode
+
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
-
-# TypeScript
-*.tsbuildinfo
-
-# Auto-generated files
-worker-configuration.d.ts

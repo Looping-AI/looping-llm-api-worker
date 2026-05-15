@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # npm / bun dependencies (package.json)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      npm-all:
+        patterns:
+          - "*"
+
+  # GitHub Actions (.github/workflows/)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

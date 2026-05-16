@@ -13,10 +13,10 @@ describe("LlmRelayWorkflow", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("calls OpenRouter, truncates reasoning, and delivers the callback", async () => {
-    const [orEntry] = loadFixture("openrouter/simple-completion");
+    const [orEntry] = loadFixture("openrouter/simple-response");
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     fetchSpy
-      // First call: OpenRouter completion
+      // First call: OpenRouter response
       .mockImplementationOnce(
         async () =>
           new Response(orEntry.body, {
@@ -51,7 +51,7 @@ describe("LlmRelayWorkflow", () => {
 
       expect(fetchSpy).toHaveBeenCalledTimes(2);
       expect(fetchSpy.mock.calls[0][0]).toBe(
-        "https://openrouter.ai/api/v1/chat/completions",
+        "https://openrouter.ai/api/v1/responses",
       );
       expect(fetchSpy.mock.calls[1][0]).toBe(env.CALLBACK_URL);
 

@@ -135,7 +135,7 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
         CALLBACK_STEP_CONFIG,
         async (): Promise<ReadableStream<Uint8Array>> => {
           const client = new OpenRouterClient(apiKey);
-          const result = await client.complete(openrouterPayload);
+          const result = await client.respond(openrouterPayload);
 
           if (RETRYABLE.has(result.status)) {
             // Encode the full response in the message so it survives

@@ -6,9 +6,8 @@ export interface TruncateResult {
 }
 
 /**
- * Parses `bodyText` as an OpenAI-style chat completion and truncates any
- * `reasoning` / `reasoning_details[].text` / `reasoning_details[].summary`
- * strings that exceed `max` characters.
+ * Parses `bodyText` as an OpenRouter Responses API response and truncates any
+ * `output[type=reasoning].summary[].text` strings that exceed `max` characters.
  *
  * Truncated form: first `floor((max-3)/2)` chars + "..." + last `floor((max-3)/2)` chars.
  *
@@ -26,28 +25,21 @@ export function truncateReasoning(
     return { text: bodyText, truncated: false };
   }
 
-  if (!isOpenAiStyleResponse(parsed)) {
+  if (!isResponsesApiResponse(parsed)) {
     return { text: bodyText, truncated: false };
   }
 
   let anyTruncated = false;
 
-  for (const choice of parsed.choices) {
-    const msg = choice.message;
-    if (typeof msg.reasoning === "string" && msg.reasoning.length > max) {
-      msg.reasoning = truncateString(msg.reasoning, max);
-      anyTruncated = true;
-    }
-    if (Array.isArray(msg.reasoning_details)) {
-      for (const detail of msg.reasoning_details) {
-        if (typeof detail.text === "string" && detail.text.length > max) {
-          detail.text = truncateString(detail.text, max);
-          anyTruncated = true;
-        }
-        if (typeof detail.summary === "string" && detail.summary.length > max) {
-          detail.summary = truncateString(detail.summary, max);
-          anyTruncated = true;
-        }
+  for (const item of parsed.output) {
+    if (item.type !== "reasoning" || !Array.isArray(item.summary)) continue;
+    for (const summaryItem of item.summary) {
+      if (
+        typeof summaryItem.text === "string" &&
+        summaryItem.text.length > max
+      ) {
+        summaryItem.text = truncateString(summaryItem.text, max);
+        anyTruncated = true;
       }
     }
   }
@@ -70,24 +62,21 @@ function truncateString(s: string, max: number): string {
   return s.slice(0, half) + "..." + s.slice(s.length - half);
 }
 
-const OpenAiMessageSchema = z.looseObject({
-  reasoning: z.string().optional(),
-  reasoning_details: z
-    .array(
-      z.looseObject({
-        text: z.string().optional(),
-        summary: z.string().optional(),
-      }),
-    )
-    .optional(),
+const SummaryItemSchema = z.looseObject({
+  text: z.string().optional(),
 });
 
-const OpenAiStyleResponseSchema = z.looseObject({
-  choices: z.array(z.looseObject({ message: OpenAiMessageSchema })),
+const OutputItemSchema = z.looseObject({
+  type: z.string(),
+  summary: z.array(SummaryItemSchema).optional(),
 });
 
-type OpenAiStyleResponse = z.infer<typeof OpenAiStyleResponseSchema>;
+const ResponsesApiSchema = z.looseObject({
+  output: z.array(OutputItemSchema),
+});
 
-function isOpenAiStyleResponse(v: unknown): v is OpenAiStyleResponse {
-  return OpenAiStyleResponseSchema.safeParse(v).success;
+type ResponsesApiResponse = z.infer<typeof ResponsesApiSchema>;
+
+function isResponsesApiResponse(v: unknown): v is ResponsesApiResponse {
+  return ResponsesApiSchema.safeParse(v).success;
 }

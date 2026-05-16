@@ -26,17 +26,17 @@ describe("extractAllowedHeaders", () => {
 });
 
 describe("OpenRouterClient", () => {
-  describe("complete()", () => {
+  describe("respond()", () => {
     it("returns status, allowed headers, and body on success", async () => {
-      const recording = useFixture("openrouter/simple-completion");
+      const recording = useFixture("openrouter/simple-response");
       try {
         // In record mode the real API key is required; in replay mode the
         // value doesn't matter because useFixture mocks globalThis.fetch.
         const apiKey = process.env.TEST_OPENROUTER_API_KEY ?? "sk-test-key";
         const client = new OpenRouterClient(apiKey);
-        const result = await client.complete({
+        const result = await client.respond({
           model: "openai/gpt-4o-mini",
-          messages: [{ role: "user", content: "Say hello in one word." }],
+          input: [{ role: "user", content: "Say hello in one word." }],
         });
 
         expect(result.status).toBe(200);
@@ -65,9 +65,9 @@ describe("OpenRouterClient", () => {
 
       const client = new OpenRouterClient("sk-test-key");
       await expect(
-        client.complete({
+        client.respond({
           model: "openai/gpt-4o-mini",
-          messages: [{ role: "user", content: "hello" }],
+          input: [{ role: "user", content: "hello" }],
         }),
       ).rejects.toThrow("Network connection refused");
     });

@@ -35,7 +35,7 @@ describe("LlmRelayWorkflow", () => {
         requestId: crypto.randomUUID(),
         openrouter: {
           model: "openai/gpt-4o-mini",
-          messages: [{ role: "user", content: "hello" }],
+          input: [{ role: "user", content: "hello" }],
         },
         encryptedApiKey,
       });
@@ -81,7 +81,7 @@ describe("LlmRelayWorkflow", () => {
         requestId: crypto.randomUUID(),
         openrouter: {
           model: "openai/gpt-4o-mini",
-          messages: [{ role: "user", content: "hello" }],
+          input: [{ role: "user", content: "hello" }],
         },
         encryptedApiKey: {
           iv: "AAAAAAAAAAAAAAAA",
@@ -125,7 +125,7 @@ describe("LlmRelayWorkflow", () => {
         requestId: crypto.randomUUID(),
         openrouter: {
           model: "openai/gpt-4o-mini",
-          messages: [{ role: "user", content: "hello" }],
+          input: [{ role: "user", content: "hello" }],
         },
         encryptedApiKey,
       });
@@ -196,7 +196,7 @@ describe("LlmRelayWorkflow", () => {
         requestId: crypto.randomUUID(),
         openrouter: {
           model: "openai/gpt-4o-mini",
-          messages: [{ role: "user", content: "hello" }],
+          input: [{ role: "user", content: "hello" }],
         },
         encryptedApiKey,
       });
@@ -239,7 +239,7 @@ describe("LlmRelayWorkflow", () => {
         requestId: crypto.randomUUID(),
         openrouter: {
           model: "openai/gpt-4o-mini",
-          messages: [{ role: "user", content: "hello" }],
+          input: [{ role: "user", content: "hello" }],
         },
         encryptedApiKey,
       });

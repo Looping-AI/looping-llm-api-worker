@@ -59,7 +59,7 @@ Tests use **Vitest** with `@cloudflare/vitest-pool-workers` (`cloudflareTest` pl
 
 ### Fixture / Recording System
 
-Network calls are isolated using a record-and-replay fixture system. Fixtures are JSON files stored under `test/fixtures/<name>.json` (e.g. `test/fixtures/openrouter/simple-completion.json`).
+Network calls are isolated using a record-and-replay fixture system. Fixtures are JSON files stored under `test/fixtures/<name>.json` (e.g. `test/fixtures/openrouter/simple-response.json`).
 
 Each fixture is an array of `FixtureEntry` objects:
 
@@ -84,7 +84,7 @@ Always call `await recording.stop()` in a `finally` block:
 
 ```ts
 it("my test", async () => {
-  const recording = useFixture("openrouter/simple-completion");
+  const recording = useFixture("openrouter/simple-response");
   try {
     // ... code under test
   } finally {
@@ -98,7 +98,7 @@ it("my test", async () => {
 Loads fixture entries directly without mocking `fetch`. Use this when you need fixture data for hand-crafted `vi.spyOn` mocks (e.g. `mockImplementationOnce`):
 
 ```ts
-const [entry] = loadFixture("openrouter/simple-completion");
+const [entry] = loadFixture("openrouter/simple-response");
 vi.spyOn(globalThis, "fetch").mockImplementationOnce(
   async () =>
     new Response(entry.body, { status: entry.status, headers: entry.headers }),

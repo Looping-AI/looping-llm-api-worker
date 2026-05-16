@@ -94,7 +94,7 @@ async function handleRelay(req: Request, env: Env): Promise<Response> {
 
 const BodySchema = z.object({
   requestId: z.string().min(1),
-  openrouter: z.looseObject({ messages: z.array(z.unknown()) }),
+  openrouter: z.looseObject({ input: z.array(z.unknown()) }),
   encryptedApiKey: z.object({ iv: z.string(), ct: z.string() }),
   truncate_thinking_to_max_chars: z.int().positive().optional().nullable(),
 });

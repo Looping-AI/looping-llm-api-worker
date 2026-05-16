@@ -17,7 +17,7 @@ const VALID_BODY = JSON.stringify({
   requestId: "req-001",
   openrouter: {
     model: "openai/gpt-4o",
-    messages: [{ role: "user", content: "hello" }],
+    input: [{ role: "user", content: "hello" }],
   },
   encryptedApiKey: {
     iv: "AAAAAAAAAAAAAAAA",
@@ -120,7 +120,7 @@ describe("POST /relay - body validation", () => {
 
   it("returns 400 when requestId is missing", async () => {
     const body = JSON.stringify({
-      openrouter: { messages: [] },
+      openrouter: { input: [] },
       encryptedApiKey: { iv: "a", ct: "b" },
     });
     const req = await makeSignedRequest(body);
@@ -128,10 +128,10 @@ describe("POST /relay - body validation", () => {
     expect(resp.status).toBe(400);
   });
 
-  it("returns 400 when openrouter.messages is missing", async () => {
+  it("returns 400 when openrouter.input is missing", async () => {
     const body = JSON.stringify({
       requestId: "r1",
-      openrouter: { model: "x" }, // no messages array
+      openrouter: { model: "x" }, // no input field
       encryptedApiKey: { iv: "a", ct: "b" },
     });
     const req = await makeSignedRequest(body);
@@ -142,7 +142,7 @@ describe("POST /relay - body validation", () => {
   it("returns 400 when encryptedApiKey is missing", async () => {
     const body = JSON.stringify({
       requestId: "r1",
-      openrouter: { messages: [] },
+      openrouter: { input: [] },
     });
     const req = await makeSignedRequest(body);
     const resp = await doFetch(req);
@@ -152,7 +152,7 @@ describe("POST /relay - body validation", () => {
   it("returns 400 when truncate_thinking_to_max_chars is not a positive integer", async () => {
     const body = JSON.stringify({
       requestId: "r1",
-      openrouter: { messages: [] },
+      openrouter: { input: [] },
       encryptedApiKey: { iv: "a", ct: "b" },
       truncate_thinking_to_max_chars: -5,
     });

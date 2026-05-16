@@ -1,4 +1,4 @@
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/responses";
 
 const ALLOWED_HEADER_PREFIXES = [
   "content-type",
@@ -33,12 +33,13 @@ export function extractAllowedHeaders(
 export class OpenRouterClient {
   constructor(private readonly apiKey: string) {}
 
-  async complete(payload: Record<string, unknown>): Promise<OpenRouterResult> {
+  async respond(payload: Record<string, unknown>): Promise<OpenRouterResult> {
     const resp = await fetch(OPENROUTER_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://loopingai.app",
       },
       body: JSON.stringify({ ...payload, stream: false }),
     });

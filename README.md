@@ -153,8 +153,8 @@ The signed message is `${X-Timestamp}.${rawBody}` (HMAC-SHA256 of the raw reques
     // object, required — forwarded verbatim to OpenRouter
     // NOTE: any `stream` field is overridden to false (relay is non-streaming)
     "model": "anthropic/claude-3-5-sonnet",
-    "messages": [{ "role": "user", "content": "Hello" }],
-    // ...any other OpenRouter chat completion fields
+    "input": [{ "role": "user", "content": "Hello" }],
+    // ...any other OpenRouter Responses API fields
   },
   "encryptedApiKey": {
     // object, required — AES-256-GCM encrypted OpenRouter key

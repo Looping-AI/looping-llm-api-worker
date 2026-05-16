@@ -9,7 +9,7 @@ export interface FixtureEntry {
 }
 
 /**
- * Loads recorded fixture entries by name (e.g. "openrouter/simple-completion").
+ * Loads recorded fixture entries by name (e.g. "openrouter/simple-response").
  * Throws if the fixture does not exist — run `RECORD=1 bun test` to create it.
  */
 export function loadFixture(name: string): FixtureEntry[] {

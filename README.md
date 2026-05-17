@@ -161,7 +161,7 @@ The signed message is `${X-Timestamp}.${rawBody}` (HMAC-SHA256 of the raw reques
     "iv": "<base64-encoded 12-byte IV>",
     "ct": "<base64-encoded ciphertext>",
   },
-  "truncate_thinking_to_max_chars": 4096, // integer > 0, optional — default 4096; set null to use default
+  "truncate_thinking_to_max_tokens": 4096, // integer > 0, optional — default 4096 tokens (~4 chars/token); set null to use default
 }
 ```
 

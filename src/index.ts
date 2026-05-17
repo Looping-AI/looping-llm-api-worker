@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { verifyInboundSignature } from "./auth";
-import { DEFAULT_THINKING_TRUNCATE } from "./truncate";
+import { DEFAULT_THINKING_TRUNCATE_TOKENS } from "./truncate";
 import type { Params } from "./workflow";
 
 export { LlmRelayWorkflow } from "./workflow";
@@ -64,7 +64,7 @@ async function handleRelay(req: Request, env: Env): Promise<Response> {
   if (!validation.ok) {
     return new Response(`Bad Request: ${validation.reason}`, { status: 400 });
   }
-  const { requestId, openrouter, encryptedApiKey, truncateThinkingMaxChars } =
+  const { requestId, openrouter, encryptedApiKey, truncateThinkingMaxTokens } =
     validation.data;
 
   // Dispatch the workflow.
@@ -72,7 +72,7 @@ async function handleRelay(req: Request, env: Env): Promise<Response> {
     const params: Params = {
       openrouterPayload: openrouter,
       encryptedApiKey,
-      truncateThinkingMaxChars,
+      truncateThinkingMaxTokens,
     };
     await env.LLM_RELAY.create({ id: requestId, params });
   } catch (err) {
@@ -96,14 +96,14 @@ const BodySchema = z.object({
   requestId: z.string().min(1),
   openrouter: z.looseObject({ input: z.array(z.unknown()) }),
   encryptedApiKey: z.object({ iv: z.string(), ct: z.string() }),
-  truncate_thinking_to_max_chars: z.int().positive().optional().nullable(),
+  truncate_thinking_to_max_tokens: z.int().positive().optional().nullable(),
 });
 
 type ValidBody = {
   requestId: string;
   openrouter: Record<string, unknown>;
   encryptedApiKey: { iv: string; ct: string };
-  truncateThinkingMaxChars: number;
+  truncateThinkingMaxTokens: number;
 };
 
 type ValidationResult =
@@ -118,15 +118,15 @@ function validateBody(raw: unknown): ValidationResult {
       reason: result.error.issues[0]?.message ?? "invalid body",
     };
   }
-  const { truncate_thinking_to_max_chars, ...rest } = result.data;
+  const { truncate_thinking_to_max_tokens, ...rest } = result.data;
   return {
     ok: true,
     data: {
       requestId: rest.requestId,
       openrouter: rest.openrouter,
       encryptedApiKey: rest.encryptedApiKey,
-      truncateThinkingMaxChars:
-        truncate_thinking_to_max_chars ?? DEFAULT_THINKING_TRUNCATE,
+      truncateThinkingMaxTokens:
+        truncate_thinking_to_max_tokens ?? DEFAULT_THINKING_TRUNCATE_TOKENS,
     },
   };
 }

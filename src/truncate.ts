@@ -1,4 +1,4 @@
-export const DEFAULT_THINKING_TRUNCATE = 4096;
+export const DEFAULT_THINKING_TRUNCATE_TOKENS = 4096;
 
 export interface TruncateResult {
   text: string;
@@ -7,17 +7,19 @@ export interface TruncateResult {
 
 /**
  * Parses `bodyText` as an OpenRouter Responses API response and truncates any
- * `output[type=reasoning].summary[].text` strings that exceed `max` characters.
+ * `output[type=reasoning].summary[].text` strings that exceed `maxTokens` tokens.
  *
- * Truncated form: first `floor((max-3)/2)` chars + "..." + last `floor((max-3)/2)` chars.
+ * Truncated form: first `floor((maxChars-3)/2)` chars + "..." + last `floor((maxChars-3)/2)` chars,
+ * where `maxChars = maxTokens * 4` (~4 chars per token on average).
  *
  * If the body cannot be parsed or does not match the expected shape, it is
  * returned verbatim with `truncated: false`.
  */
 export function truncateReasoning(
   bodyText: string,
-  max: number,
+  maxTokens: number,
 ): TruncateResult {
+  const max = maxTokens * 4; // ~4 chars per token on average
   let parsed: unknown;
   try {
     parsed = JSON.parse(bodyText);

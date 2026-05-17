@@ -149,12 +149,12 @@ describe("POST /relay - body validation", () => {
     expect(resp.status).toBe(400);
   });
 
-  it("returns 400 when truncate_thinking_to_max_chars is not a positive integer", async () => {
+  it("returns 400 when truncate_thinking_to_max_tokens is not a positive integer", async () => {
     const body = JSON.stringify({
       requestId: "r1",
       openrouter: { input: [] },
       encryptedApiKey: { iv: "a", ct: "b" },
-      truncate_thinking_to_max_chars: -5,
+      truncate_thinking_to_max_tokens: -5,
     });
     const req = await makeSignedRequest(body);
     const resp = await doFetch(req);
@@ -180,6 +180,32 @@ describe("POST /relay - success", () => {
     const json = (await resp.json()) as { ok: boolean; requestId: string };
     expect(json.ok).toBe(true);
     expect(json.requestId).toBe("req-001");
+  });
+
+  it("passes truncate_thinking_to_max_tokens as-is to workflow params", async () => {
+    const createSpy = vi
+      .spyOn(env.LLM_RELAY, "create")
+      .mockResolvedValue({} as unknown as WorkflowInstance);
+
+    const body = JSON.stringify({
+      requestId: "req-tok",
+      openrouter: {
+        model: "openai/gpt-4o",
+        input: [{ role: "user", content: "hi" }],
+      },
+      encryptedApiKey: {
+        iv: "AAAAAAAAAAAAAAAA",
+        ct: "AAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      },
+      truncate_thinking_to_max_tokens: 512,
+    });
+    const resp = await doFetch(await makeSignedRequest(body));
+    expect(resp.status).toBe(202);
+    const { params } = createSpy.mock.calls[0][0] as {
+      id: string;
+      params: { truncateThinkingMaxTokens: number };
+    };
+    expect(params.truncateThinkingMaxTokens).toBe(512);
   });
 
   it("deduplicates: repeated requests with the same requestId return 202 idempotently", async () => {

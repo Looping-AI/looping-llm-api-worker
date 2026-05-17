@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { truncateReasoning, DEFAULT_THINKING_TRUNCATE } from "../src/truncate";
+import {
+  truncateReasoning,
+  DEFAULT_THINKING_TRUNCATE_TOKENS,
+} from "../src/truncate";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,26 +67,26 @@ describe("truncateReasoning", () => {
 
   it("does not truncate summary text that equals max exactly", () => {
     const input = makeResponse(["a".repeat(100)]);
-    const result = truncateReasoning(input, 100);
+    const result = truncateReasoning(input, 25); // 25 tokens * 4 = 100 chars, exactly at boundary
     expect(result.text).toBe(input);
     expect(result.truncated).toBe(false);
   });
 
   it("truncates summary text longer than max with correct head+tail", () => {
-    const max = 20; // half = floor((20-3)/2) = 8
+    const max = 20; // 20 tokens * 4 = 80 chars; half = floor((80-3)/2) = 38
     const result = truncateReasoning(makeResponse(["A".repeat(100)]), max);
 
     expect(result.truncated).toBe(true);
 
     const parsed = JSON.parse(result.text);
     const got: string = parsed.output[0].summary[0].text;
-    const half = Math.floor((max - 3) / 2);
+    const half = Math.floor((max * 4 - 3) / 2);
     expect(got).toBe("A".repeat(half) + "..." + "A".repeat(half));
     expect(got.length).toBe(half * 2 + 3);
   });
 
   it("truncates a long summary item and leaves a short one untouched", () => {
-    const max = 10; // half = 3
+    const max = 10; // 10 tokens * 4 = 40 chars; half = floor((40-3)/2) = 18
     const result = truncateReasoning(
       makeResponse(["short", "X".repeat(50)]),
       max,
@@ -93,7 +96,7 @@ describe("truncateReasoning", () => {
     const parsed = JSON.parse(result.text);
     const summary = parsed.output[0].summary;
     expect(summary[0].text).toBe("short"); // untouched
-    const half = Math.floor((max - 3) / 2);
+    const half = Math.floor((max * 4 - 3) / 2);
     expect(summary[1].text).toBe("X".repeat(half) + "..." + "X".repeat(half));
   });
 
@@ -115,7 +118,7 @@ describe("truncateReasoning", () => {
 
   it("does not re-serialise the body when nothing was truncated", () => {
     const input = makeResponse(["short"]);
-    const result = truncateReasoning(input, DEFAULT_THINKING_TRUNCATE);
+    const result = truncateReasoning(input, DEFAULT_THINKING_TRUNCATE_TOKENS);
     expect(result.text).toBe(input);
     expect(result.truncated).toBe(false);
   });

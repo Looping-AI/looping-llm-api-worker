@@ -17,7 +17,7 @@ import type { EncryptedApiKey } from "./crypto";
 export interface Params {
   openrouterPayload: Record<string, unknown>;
   encryptedApiKey: EncryptedApiKey;
-  truncateThinkingMaxChars: number;
+  truncateThinkingMaxTokens: number;
 }
 
 // HTTP status codes from OpenRouter / upstream that are worth retrying.
@@ -86,7 +86,7 @@ function makeStream(
  */
 export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
   async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
-    const { openrouterPayload, encryptedApiKey, truncateThinkingMaxChars } =
+    const { openrouterPayload, encryptedApiKey, truncateThinkingMaxTokens } =
       event.payload;
     const requestId = event.instanceId;
     const callback = new CallbackClient(
@@ -153,7 +153,7 @@ export class LlmRelayWorkflow extends WorkflowEntrypoint<Env, Params> {
             return makeStream(
               { status: result.status, headers: result.headers },
               toGzip(
-                truncateReasoning(result.body, truncateThinkingMaxChars).text,
+                truncateReasoning(result.body, truncateThinkingMaxTokens).text,
               ),
             );
           } catch (e) {
